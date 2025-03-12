@@ -1,0 +1,5 @@
+snake:
+  sound: 'sizzle'
+
+cat:
+  sound: "meow"

@@ -1,0 +1,10 @@
+snake:
+  sound: 'hiss'
+  foot: 0
+
+cat:
+  foot: 4
+
+dog:
+  sound: 'woof-woof'
+  foot: 4
