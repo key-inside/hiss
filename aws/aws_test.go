@@ -7,7 +7,7 @@ import (
 )
 
 func Test_AWSParameterStore(t *testing.T) {
-	arn := "arn:aws:ssm:::parameter/test/patrasche/config.yaml"
+	arn := "arn:aws:ssm:::parameter/test/animal/config.yaml"
 	str, err := GetString(arn)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
@@ -17,7 +17,7 @@ func Test_AWSParameterStore(t *testing.T) {
 }
 
 func Test_AWSSecretsManager(t *testing.T) {
-	arn := "arn:aws:secretsmanager:::secret:test/patrasche/secrets.yaml"
+	arn := "arn:aws:secretsmanager:::secret:test/animal/secrets.yaml"
 	str, err := GetString(arn)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)

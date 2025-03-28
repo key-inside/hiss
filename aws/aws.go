@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -86,22 +87,29 @@ func defaultConfig(o *configOption) (aws.Config, error) {
 	return config.LoadDefaultConfig(context.TODO())
 }
 
-func GetStringFromSecretsManager(a arn.ARN, ops ...Option) (string, error) {
+func NewClient[O any, C any](newFromConfig func(aws.Config, ...func(*O)) *C, ops ...Option) (*C, error) {
 	cfgOps := resolveConfigOption(ops...)
 
 	cfg, err := defaultConfig(cfgOps)
 	if err != nil {
-		return "", fmt.Errorf("failed to load config: %w", err)
+		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
-	optFns := []func(*secretsmanager.Options){}
+	optFns := []func(*O){}
 	if cfgOps.baseEndpoint != nil {
-		optFns = append(optFns, func(o *secretsmanager.Options) {
-			o.BaseEndpoint = cfgOps.baseEndpoint
+		optFns = append(optFns, func(o *O) {
+			reflect.ValueOf(o).Elem().FieldByName("BaseEndpoint").Set(reflect.ValueOf(cfgOps.baseEndpoint))
 		})
 	}
 
-	client := secretsmanager.NewFromConfig(cfg, optFns...)
+	return newFromConfig(cfg, optFns...), nil
+}
+
+func GetStringFromSecretsManager(a arn.ARN, ops ...Option) (string, error) {
+	client, err := NewClient(secretsmanager.NewFromConfig, ops...)
+	if err != nil {
+		return "", fmt.Errorf("failed to create client: %w", err)
+	}
 
 	res, err := client.GetSecretValue(context.TODO(), &secretsmanager.GetSecretValueInput{
 		SecretId: aws.String(strings.TrimPrefix(a.Resource, "secret:")),
@@ -114,21 +122,10 @@ func GetStringFromSecretsManager(a arn.ARN, ops ...Option) (string, error) {
 }
 
 func GetStringFromParameterStore(a arn.ARN, ops ...Option) (string, error) {
-	cfgOps := resolveConfigOption(ops...)
-
-	cfg, err := defaultConfig(cfgOps)
+	client, err := NewClient(ssm.NewFromConfig, ops...)
 	if err != nil {
-		return "", fmt.Errorf("failed to load config: %w", err)
+		return "", fmt.Errorf("failed to create client: %w", err)
 	}
-
-	optFns := []func(*ssm.Options){}
-	if cfgOps.baseEndpoint != nil {
-		optFns = append(optFns, func(o *ssm.Options) {
-			o.BaseEndpoint = cfgOps.baseEndpoint
-		})
-	}
-
-	client := ssm.NewFromConfig(cfg, optFns...)
 
 	res, err := client.GetParameter(context.TODO(), &ssm.GetParameterInput{
 		Name: aws.String(strings.TrimPrefix(a.Resource, "parameter")),
@@ -150,21 +147,10 @@ func GetItemFromDynamoDB(tableName string, key map[string]any, ops ...Option) (m
 		}
 	}
 
-	cfgOps := resolveConfigOption(ops...)
-
-	cfg, err := defaultConfig(cfgOps)
+	client, err := NewClient(dynamodb.NewFromConfig, ops...)
 	if err != nil {
-		return nil, fmt.Errorf("failed to load config: %w", err)
+		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
-
-	optFns := []func(*dynamodb.Options){}
-	if cfgOps.baseEndpoint != nil {
-		optFns = append(optFns, func(o *dynamodb.Options) {
-			o.BaseEndpoint = cfgOps.baseEndpoint
-		})
-	}
-
-	client := dynamodb.NewFromConfig(cfg, optFns...)
 
 	res, err := client.GetItem(context.TODO(), &dynamodb.GetItemInput{
 		TableName: aws.String(tableName),
@@ -183,21 +169,10 @@ func PutItemToDynamoDB(tableName string, item any, ops ...Option) error {
 		return fmt.Errorf("failed to marshal item: %w", err)
 	}
 
-	cfgOps := resolveConfigOption(ops...)
-
-	cfg, err := defaultConfig(cfgOps)
+	client, err := NewClient(dynamodb.NewFromConfig, ops...)
 	if err != nil {
-		return fmt.Errorf("failed to load config: %w", err)
+		return fmt.Errorf("failed to create client: %w", err)
 	}
-
-	optFns := []func(*dynamodb.Options){}
-	if cfgOps.baseEndpoint != nil {
-		optFns = append(optFns, func(o *dynamodb.Options) {
-			o.BaseEndpoint = cfgOps.baseEndpoint
-		})
-	}
-
-	client := dynamodb.NewFromConfig(cfg, optFns...)
 
 	_, err = client.PutItem(context.TODO(), &dynamodb.PutItemInput{
 		TableName: aws.String(tableName),
